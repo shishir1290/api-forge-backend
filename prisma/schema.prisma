@@ -1,0 +1,118 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String            @id @default(cuid())
+  name            String?
+  email           String?           @unique
+  password        String?
+  image           String?
+  workspaces      WorkspaceMember[]
+  sentInvitations Invitation[]      @relation("SentInvitations")
+}
+
+model Workspace {
+  id           String            @id @default(cuid())
+  name         String
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  members      WorkspaceMember[]
+  collections  Collection[]
+  environments Environment[]
+  invitations  Invitation[]
+}
+
+model WorkspaceMember {
+  id          String    @id @default(cuid())
+  role        String    @default("MEMBER") // OWNER, ADMIN, MEMBER, VIEWER
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+
+  @@unique([userId, workspaceId])
+}
+
+model Collection {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  auth        Json?
+  headers     Json?
+  variables   Json?
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  requests    Request[]
+  folders     Folder[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Folder {
+  id             String     @id @default(cuid())
+  name           String
+  description    String?
+  auth           Json?
+  headers        Json?
+  variables      Json?
+  collectionId   String
+  collection     Collection @relation(fields: [collectionId], references: [id])
+  parentFolderId String?
+  parentFolder   Folder?    @relation("SubFolders", fields: [parentFolderId], references: [id])
+  subFolders     Folder[]   @relation("SubFolders")
+  requests       Request[]
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+}
+
+model Request {
+  id                String      @id @default(cuid())
+  name              String
+  method            String
+  url               String
+  description       String?
+  headers           Json?
+  params            Json?
+  body              Json?
+  auth              Json?
+  preRequestScript  String?
+  postRequestScript String?
+  collectionId      String?
+  collection        Collection? @relation(fields: [collectionId], references: [id])
+  folderId          String?
+  folder            Folder?     @relation(fields: [folderId], references: [id])
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+}
+
+model Environment {
+  id          String    @id @default(cuid())
+  name        String
+  variables   Json?
+  secrets     Json?
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Invitation {
+  id          String    @id @default(cuid())
+  email       String
+  role        String    @default("MEMBER")
+  status      String    @default("PENDING") // PENDING, ACCEPTED, REJECTED
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  inviterId   String
+  inviter     User      @relation(name: "SentInvitations", fields: [inviterId], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([email, workspaceId])
+}
