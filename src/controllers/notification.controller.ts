@@ -1,6 +1,7 @@
 import { Response } from "express";
 import { prisma } from "../lib/prisma.js";
 import { AuthRequest } from "../middleware/auth.middleware.js";
+import { io } from "../index.js";
 
 export const getInvitations = async (req: AuthRequest, res: Response) => {
   try {
@@ -70,6 +71,13 @@ export const respondToInvitation = async (req: AuthRequest, res: Response) => {
           data: { status: "ACCEPTED" },
         });
       });
+
+      // 3. Notify the workspace room about the new member
+      io.to(invitation.workspaceId).emit("workspace-change", {
+        type: "MEMBER_JOINED",
+        payload: { workspaceId: invitation.workspaceId, userId },
+      });
+
       return res.json({
         message: "Invitation accepted",
         workspaceId: invitation.workspaceId,

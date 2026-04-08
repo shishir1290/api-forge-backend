@@ -248,6 +248,12 @@ export const updateMemberRole = async (req: AuthRequest, res: Response) => {
       data: { role: role.toUpperCase() },
     });
 
+    // Notify workspace
+    io.to(workspaceId).emit("workspace-change", {
+      type: "MEMBER_UPDATED",
+      payload: updatedMember,
+    });
+
     res.json({ member: updatedMember });
   } catch (error) {
     console.error("Update role error:", error);
@@ -312,6 +318,12 @@ export const removeMember = async (req: AuthRequest, res: Response) => {
       });
       console.log(`RemoveMember DEBUG: doesMemberExist=${!!check}`);
     }
+
+    // Notify workspace
+    io.to(workspaceId).emit("workspace-change", {
+      type: "MEMBER_REMOVED",
+      payload: { userId: targetUserId, workspaceId },
+    });
 
     res.json({ message: "Member removed" });
   } catch (error) {

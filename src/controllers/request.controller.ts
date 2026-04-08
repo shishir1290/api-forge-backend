@@ -55,12 +55,17 @@ export const createRequest = async (req: AuthRequest, res: Response) => {
       },
       include: {
         collection: true,
+        folder: { include: { collection: true } },
       },
     });
 
-    // Notify others in the workspace
-    if (apiRequest.collection) {
-      io.to(apiRequest.collection.workspaceId).emit("workspace-change", {
+    // Resolve workspaceId from either collection or folder
+    const wsId =
+      apiRequest.collection?.workspaceId ||
+      apiRequest.folder?.collection.workspaceId;
+
+    if (wsId) {
+      io.to(wsId).emit("workspace-change", {
         type: "REQUEST_CREATED",
         payload: apiRequest,
       });
@@ -120,12 +125,17 @@ export const updateRequest = async (req: AuthRequest, res: Response) => {
       },
       include: {
         collection: true,
+        folder: { include: { collection: true } },
       },
     });
 
-    // Notify others in the workspace
-    if (updatedRequest.collection) {
-      io.to(updatedRequest.collection.workspaceId).emit("workspace-change", {
+    // Resolve workspaceId from either collection or folder
+    const wsId =
+      updatedRequest.collection?.workspaceId ||
+      updatedRequest.folder?.collection.workspaceId;
+
+    if (wsId) {
+      io.to(wsId).emit("workspace-change", {
         type: "REQUEST_UPDATED",
         payload: updatedRequest,
       });
