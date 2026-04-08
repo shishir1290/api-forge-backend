@@ -102,12 +102,8 @@ export const deleteCollection = async (req: AuthRequest, res: Response) => {
         .json({ error: "Viewers cannot delete collections" });
     }
 
-    // Cascading delete
-    await prisma.$transaction([
-      prisma.request.deleteMany({ where: { collectionId: id } }),
-      prisma.folder.deleteMany({ where: { collectionId: id } }),
-      prisma.collection.delete({ where: { id } }),
-    ]);
+    // Cascading delete handled by DB
+    await prisma.collection.delete({ where: { id } });
 
     // Notify others
     io.to(collection.workspaceId).emit("workspace-change", {

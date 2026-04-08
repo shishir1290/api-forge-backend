@@ -11,23 +11,25 @@ export const getInvitations = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ error: "User not found" });
     }
 
+    const notifications = await prisma.notification.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+    });
+
+    // Legacy support for invitations tab (filtered to pending)
     const invitations = await prisma.invitation.findMany({
       where: {
         email: user.email,
         status: "PENDING",
       },
       include: {
-        workspace: {
-          select: { id: true, name: true },
-        },
-        inviter: {
-          select: { id: true, name: true, email: true },
-        },
+        workspace: { select: { id: true, name: true } },
+        inviter: { select: { id: true, name: true, email: true } },
       },
       orderBy: { createdAt: "desc" },
     });
 
-    res.json({ invitations });
+    res.json({ notifications, invitations });
   } catch (error) {
     console.error("Fetch invitations error:", error);
     res.status(500).json({ error: "Failed to fetch invitations" });
@@ -70,6 +72,16 @@ export const respondToInvitation = async (req: AuthRequest, res: Response) => {
           where: { id },
           data: { status: "ACCEPTED" },
         });
+
+        // 3. Update notification status
+        await tx.notification.updateMany({
+          where: {
+            userId,
+            type: "INVITATION",
+            data: { path: ["invitationId"], equals: id },
+          },
+          data: { status: "ACCEPTED", read: true },
+        });
       });
 
       // 3. Notify the workspace room about the new member
@@ -83,10 +95,20 @@ export const respondToInvitation = async (req: AuthRequest, res: Response) => {
         workspaceId: invitation.workspaceId,
       });
     } else if (action === "REJECT") {
-      await prisma.invitation.update({
-        where: { id },
-        data: { status: "REJECTED" },
-      });
+      await prisma.$transaction([
+        prisma.invitation.update({
+          where: { id },
+          data: { status: "REJECTED" },
+        }),
+        prisma.notification.updateMany({
+          where: {
+            userId,
+            type: "INVITATION",
+            data: { path: ["invitationId"], equals: id },
+          },
+          data: { status: "REJECTED", read: true },
+        }),
+      ]);
       return res.json({ message: "Invitation rejected" });
     } else {
       return res.status(400).json({ error: "Invalid action" });

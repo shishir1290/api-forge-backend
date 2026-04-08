@@ -201,6 +201,29 @@ export const inviteToWorkspace = async (req: AuthRequest, res: Response) => {
     // Notify user if they are online (future improvement: search by email to find socket)
     // For now, we'll rely on pulling when they refresh or open the app
 
+    // Create or update invitation notification for the user
+    if (user) {
+      await prisma.notification.create({
+        data: {
+          userId: user.id,
+          type: "INVITATION",
+          title: "New Workspace Invitation",
+          message: `You have been invited to join the workspace "${invitation.workspace.name}" as a ${invitation.role}.`,
+          data: {
+            invitationId: invitation.id,
+            workspaceId: invitation.workspaceId,
+            inviterName: invitation.inviter.name,
+          },
+        },
+      });
+
+      // Emit real-time notification to the user
+      io.to(`user:${user.id}`).emit("notification", {
+        type: "INVITATION",
+        payload: invitation,
+      });
+    }
+
     res.json({ invitation });
   } catch (error) {
     console.error("Invite error:", error);
