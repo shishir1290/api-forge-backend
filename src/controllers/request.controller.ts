@@ -5,22 +5,35 @@ import { AuthRequest } from "../middleware/auth.middleware.js";
 
 export const createRequest = async (req: AuthRequest, res: Response) => {
   try {
-    const { name, method, url, collectionId, headers, body } = req.body;
+    const { name, method, url, collectionId, folderId, headers, body } =
+      req.body;
     const userId = req.userId!;
 
-    // Check if user has access to the collection's workspace
-    const collection = await prisma.collection.findUnique({
-      where: { id: collectionId },
-      include: { workspace: { include: { members: true } } },
-    });
+    let workspace;
 
-    if (!collection) {
-      return res.status(404).json({ error: "Collection not found" });
+    if (collectionId) {
+      const collection = await prisma.collection.findUnique({
+        where: { id: collectionId },
+        include: { workspace: { include: { members: true } } },
+      });
+      workspace = collection?.workspace;
+    } else if (folderId) {
+      const folder = await prisma.folder.findUnique({
+        where: { id: folderId },
+        include: {
+          collection: {
+            include: { workspace: { include: { members: true } } },
+          },
+        },
+      });
+      workspace = folder?.collection.workspace;
     }
 
-    const membership = collection.workspace.members.find(
-      (m) => m.userId === userId,
-    );
+    if (!workspace) {
+      return res.status(404).json({ error: "Context not found" });
+    }
+
+    const membership = workspace.members.find((m) => m.userId === userId);
 
     if (!membership) {
       return res.status(403).json({ error: "Access denied" });
@@ -36,6 +49,7 @@ export const createRequest = async (req: AuthRequest, res: Response) => {
         method,
         url,
         collectionId,
+        folderId,
         headers,
         body,
       },
@@ -68,6 +82,13 @@ export const updateRequest = async (req: AuthRequest, res: Response) => {
       where: { id },
       include: {
         collection: { include: { workspace: { include: { members: true } } } },
+        folder: {
+          include: {
+            collection: {
+              include: { workspace: { include: { members: true } } },
+            },
+          },
+        },
       },
     });
 
@@ -75,9 +96,10 @@ export const updateRequest = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ error: "Request not found" });
     }
 
-    const membership = apiRequest.collection?.workspace.members.find(
-      (m) => m.userId === userId,
-    );
+    const workspace =
+      apiRequest.collection?.workspace ||
+      apiRequest.folder?.collection.workspace;
+    const membership = workspace?.members.find((m) => m.userId === userId);
 
     if (!membership) {
       return res.status(403).json({ error: "Access denied" });
