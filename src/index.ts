@@ -6,6 +6,8 @@ import dotenv from "dotenv";
 import workspaceRoutes from "./routes/workspace.routes.js";
 import collectionRoutes from "./routes/collection.routes.js";
 import requestRoutes from "./routes/request.routes.js";
+import folderRoutes from "./routes/folder.routes.js";
+import environmentRoutes from "./routes/environment.routes.js";
 import authRoutes from "./routes/auth.routes.js";
 import notificationRoutes from "./routes/notification.routes.js";
 import { authenticate } from "./middleware/auth.middleware.js";
@@ -28,6 +30,8 @@ app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.use("/api/auth", authRoutes);
 app.use("/api/workspaces", authenticate, workspaceRoutes);
 app.use("/api/collections", authenticate, collectionRoutes);
+app.use("/api/folders", authenticate, folderRoutes);
+app.use("/api/environments", authenticate, environmentRoutes);
 app.use("/api/requests", authenticate, requestRoutes);
 app.use("/api/notifications", authenticate, notificationRoutes);
 

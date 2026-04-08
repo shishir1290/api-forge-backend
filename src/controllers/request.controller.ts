@@ -53,19 +53,10 @@ export const createRequest = async (req: AuthRequest, res: Response) => {
         headers,
         body,
       },
-      include: {
-        collection: true,
-        folder: { include: { collection: true } },
-      },
     });
 
-    // Resolve workspaceId from either collection or folder
-    const wsId =
-      apiRequest.collection?.workspaceId ||
-      apiRequest.folder?.collection.workspaceId;
-
-    if (wsId) {
-      io.to(wsId).emit("workspace-change", {
+    if (workspace.id) {
+      io.to(workspace.id).emit("workspace-change", {
         type: "REQUEST_CREATED",
         payload: apiRequest,
       });
@@ -173,5 +164,52 @@ export const getRequests = async (req: AuthRequest, res: Response) => {
     res.json(requests);
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch requests" });
+  }
+};
+
+export const deleteRequest = async (req: AuthRequest, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const userId = req.userId!;
+
+    const apiRequest = await prisma.request.findUnique({
+      where: { id },
+      include: {
+        collection: true,
+        folder: { include: { collection: true } },
+      },
+    });
+
+    if (!apiRequest) {
+      return res.status(404).json({ error: "Request not found" });
+    }
+
+    const workspaceId =
+      apiRequest.collection?.workspaceId ||
+      apiRequest.folder?.collection.workspaceId;
+
+    if (!workspaceId) {
+      return res.status(500).json({ error: "Workspace context not found" });
+    }
+
+    // Check membership
+    const membership = await prisma.workspaceMember.findUnique({
+      where: { userId_workspaceId: { userId, workspaceId } },
+    });
+
+    if (!membership || membership.role.toUpperCase() === "VIEWER") {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    await prisma.request.delete({ where: { id } });
+
+    io.to(workspaceId).emit("workspace-change", {
+      type: "REQUEST_DELETED",
+      payload: { id },
+    });
+
+    res.json({ message: "Request deleted" });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to delete request" });
   }
 };

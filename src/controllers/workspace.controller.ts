@@ -70,35 +70,39 @@ export const getWorkspaceCollections = async (
     const { id } = req.params;
     const userId = req.userId!;
 
-    // Check membership
-    const member = await prisma.workspaceMember.findUnique({
-      where: {
-        userId_workspaceId: { userId, workspaceId: id as string },
-      },
-    });
-
-    if (!member) {
-      return res.status(403).json({ error: "Access denied" });
-    }
-
-    const collections = await prisma.collection.findMany({
-      where: { workspaceId: id as string },
-      orderBy: { createdAt: "asc" },
+    // Consolidated Query: Fetch membership, collections (with folders/requests), and environments in one go
+    const workspace = await prisma.workspace.findUnique({
+      where: { id: id as string },
       include: {
-        folders: {
+        members: {
+          where: { userId },
+        },
+        collections: {
           orderBy: { createdAt: "asc" },
           include: {
+            folders: {
+              orderBy: { createdAt: "asc" },
+              include: {
+                requests: {
+                  orderBy: { createdAt: "asc" },
+                },
+              },
+            },
             requests: {
+              where: { folderId: null },
               orderBy: { createdAt: "asc" },
             },
           },
         },
-        requests: {
-          where: { folderId: null },
-          orderBy: { createdAt: "asc" },
-        },
+        environments: true,
       },
     });
+
+    if (!workspace || workspace.members.length === 0) {
+      return res
+        .status(403)
+        .json({ error: "Access denied or workspace not found" });
+    }
 
     const buildFolderTree = (
       allFolders: any[],
@@ -112,16 +116,15 @@ export const getWorkspaceCollections = async (
         }));
     };
 
-    const mappedCollections = collections.map((col) => ({
+    const mappedCollections = workspace.collections.map((col) => ({
       ...col,
       folders: buildFolderTree(col.folders, null),
     }));
 
-    const environments = await prisma.environment.findMany({
-      where: { workspaceId: id as string },
+    res.json({
+      collections: mappedCollections,
+      environments: workspace.environments,
     });
-
-    res.json({ collections: mappedCollections, environments });
   } catch (error) {
     console.error("Fetch collections error:", error);
     res.status(500).json({ error: "Failed to fetch collections" });
