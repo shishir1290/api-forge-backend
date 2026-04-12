@@ -5,8 +5,17 @@ import { AuthRequest } from "../middleware/auth.middleware.js";
 
 export const createRequest = async (req: AuthRequest, res: Response) => {
   try {
-    const { name, method, url, collectionId, folderId, headers, body } =
-      req.body;
+    const {
+      name,
+      method,
+      url,
+      collectionId,
+      folderId,
+      headers,
+      body,
+      preRequestScript,
+      postRequestScript,
+    } = req.body;
     const userId = req.userId!;
 
     let workspace;
@@ -52,6 +61,8 @@ export const createRequest = async (req: AuthRequest, res: Response) => {
         folderId,
         headers,
         body,
+        preRequestScript,
+        postRequestScript,
       },
     });
 
@@ -71,7 +82,15 @@ export const createRequest = async (req: AuthRequest, res: Response) => {
 export const updateRequest = async (req: AuthRequest, res: Response) => {
   try {
     const id = req.params.id as string;
-    const { name, method, url, headers, body } = req.body;
+    const {
+      name,
+      method,
+      url,
+      headers,
+      body,
+      preRequestScript,
+      postRequestScript,
+    } = req.body;
     const userId = req.userId!;
 
     const apiRequest = await prisma.request.findUnique({
@@ -113,6 +132,8 @@ export const updateRequest = async (req: AuthRequest, res: Response) => {
         url,
         headers,
         body,
+        preRequestScript,
+        postRequestScript,
       },
       include: {
         collection: true,
